@@ -82,14 +82,14 @@ export class Liquid extends Component {
       s.spriteFrame = this.frame;
       s.color = this.color.clone();
       if(this.mat) {
-        s.setSharedMaterial(this.mat, 0, true);
+        s.customMaterial = this.mat
       }
       this.node.addChild(node);
       this.system.GetUserDataBuffer()[i] = node;
     });
   }
 
-  update() {
+  lateUpdate() {
     // update particle locations
     this.forEachParticle((i) => {
       const node: Node = this.system.GetUserDataBuffer<Node>()[i];
