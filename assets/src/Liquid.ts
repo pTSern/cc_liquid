@@ -6,12 +6,13 @@ import {
   SpriteFrame,
   Node,
   math,
-  UITransformComponent,
   PHYSICS_2D_PTM_RATIO,
+  UITransform,
+  Color,
+  Material
 } from "cc";
 const { ccclass, property } = _decorator;
 
-// followings and import-map.json are very dirty hack to refer hidden types such as b2ParticleSystem.
 import * as b2 from "@cocos/box2d/src/box2d";
 // @ts-ignore
 b2 = b2.default;
@@ -30,13 +31,18 @@ b2 = b2.default;
 
 @ccclass("Liquid")
 export class Liquid extends Component {
-  particleSystem: b2.b2ParticleSystem;
-  particleGroup: b2.b2ParticleGroup;
+  system: b2.b2ParticleSystem;
+  group: b2.b2ParticleGroup;
 
   @property(SpriteFrame)
-  particleSpriteFrame: SpriteFrame;
-  @property(Number)
-  particleRadius: number;
+  frame: SpriteFrame;
+
+  @property({ })
+  radius: number = 1.5;
+  @property({ })
+  color: Color = Color.WHITE.clone();
+  @property({ type: Material })
+  mat: Material = null
 
   start() {
     // a hack to avoid strange runtime error raised when there are no RigidBody2D in world.
@@ -47,8 +53,8 @@ export class Liquid extends Component {
 
     // create particle system from definition
     const particleSystemDef = new b2.b2ParticleSystemDef();
-    particleSystemDef.radius = this.particleRadius / PHYSICS_2D_PTM_RATIO;
-    this.particleSystem = world.CreateParticleSystem(particleSystemDef);
+    particleSystemDef.radius = this.radius / PHYSICS_2D_PTM_RATIO;
+    this.system = world.CreateParticleSystem(particleSystemDef);
 
     // create particle group from definition
     const groupDef = new b2.b2ParticleGroupDef();
@@ -66,24 +72,28 @@ export class Liquid extends Component {
       center.x / PHYSICS_2D_PTM_RATIO,
       center.y / PHYSICS_2D_PTM_RATIO
     );
-    this.particleGroup = this.particleSystem.CreateParticleGroup(groupDef);
+    this.group = this.system.CreateParticleGroup(groupDef);
 
     // create sprites for each particles
     this.forEachParticle((i) => {
-      const node = new Node();
+      const node = new Node(`particle_${i}`);
       node.layer = this.node.layer;
       const s = node.addComponent(Sprite);
-      s.spriteFrame = this.particleSpriteFrame;
+      s.spriteFrame = this.frame;
+      s.color = this.color.clone();
+      if(this.mat) {
+        s.setSharedMaterial(this.mat, 0, true);
+      }
       this.node.addChild(node);
-      this.particleSystem.GetUserDataBuffer()[i] = node;
+      this.system.GetUserDataBuffer()[i] = node;
     });
   }
 
-  update(deltaTime: number) {
+  update() {
     // update particle locations
     this.forEachParticle((i) => {
-      const node: Node = this.particleSystem.GetUserDataBuffer<Node>()[i];
-      const position = this.particleSystem.GetPositionBuffer()[i];
+      const node: Node = this.system.GetUserDataBuffer<Node>()[i];
+      const position = this.system.GetPositionBuffer()[i];
       node.position = this.uiTransform.convertToNodeSpaceAR(
         new math.Vec3(
           position.x * PHYSICS_2D_PTM_RATIO,
@@ -93,21 +103,21 @@ export class Liquid extends Component {
     });
   }
 
-  private forEachParticle(f: (number) => void): void {
-    if (!this.particleGroup) {
+  private forEachParticle(f: (number: number) => void): void {
+    if (!this.group) {
       return;
     }
     for (
-      let i = this.particleGroup.GetBufferIndex();
-      i < this.particleGroup.GetParticleCount();
+      let i = this.group.GetBufferIndex();
+      i < this.group.GetParticleCount();
       i++
     ) {
       f(i);
     }
   }
 
-  private get uiTransform(): UITransformComponent {
-    return this.node.getComponent(UITransformComponent);
+  private get uiTransform(): UITransform {
+    return this.node.getComponent(UITransform);
   }
 
   /**
